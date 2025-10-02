@@ -1,0 +1,47 @@
+#1
+git log origin/main..HEAD
+
+#2
+git tag
+#PURPOSE: The git tag command is used to mark specific points in a repository’s history usually for something important, and
+often to label release versions
+
+#3
+git filter-repo --path filename --invert-paths
+#PURPOSE: This rewrites history to remove the file.  
+If only removing going forward: `git rm --cached filename && git commit`.
+
+#4
+git stash
+#USE git stash apply to bring it back later
+
+#5 
+git commit --amend -m "New commit message"
+OUTCOME:
+[main 8cd395b] New commit message
+ Author: Danilo Freire <danilofreire@gmail.com>
+ Date: Wed Sep 10 16:29:55 2025 -0400
+ 3 files changed, 15 insertions(+), 18 deletions(-)
+
+#6 
+git reset --soft HEAD~1
+git add file1
+git commit -m "First smaller commit"
+git add file2
+git commit -m "Second smaller commit"
+
+#7
+git diff main...feature
+PURPOSE: Shows changes on feature branch since it diverged from main.
+
+#8 
+git remote -v
+PURPOSE: Shows remote names and URLs
+
+#9
+git merge: combines two branches by creating a new merge commit, preserving the full history.
+git rebase: reapplies commits onto another branch, creating a linear history by rewriting commits.
+
+#10
+git log --grep="message"
+PURPOSE: Searches commit messages for the message.
