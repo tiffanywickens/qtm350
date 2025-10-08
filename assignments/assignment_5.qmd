@@ -1,0 +1,35 @@
+#1
+title: "World Development Indicators – 2022 Snapshot"
+author: "Tiffany Wickens"
+date: 10/08/2025
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    code-tools: true
+  pdf:
+    documentclass: article
+    toc: true
+bibliography: references.bib
+links-as-notes: true
+execute:
+  echo: false 
+  warning: false
+fig-cap-location: bottom
+lang: en
+
+quarto render assignment 5.qmd
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load data saved from the notebook
+wdi = pd.read_csv("wdi.csv")
+# Basic cleaning: standardize country names and drop all‑NA rows
+wdi['country'] = wdi['country'].str.strip()
+wdi = wdi.dropna(how='all', axis=0)
+
+wdi.shape
