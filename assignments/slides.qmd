@@ -1,0 +1,331 @@
+---
+title: "Exploratory Data Analysis"
+subtitle: "GDP per Capita · Life Expectancy · Unemployment (WDI, 2022)"
+author: "Tiffany Wickens"
+date: "10/8/2025"
+format:
+  revealjs:
+    theme: [beige, custom.scss]   # Task 10: custom theme (with SCSS)
+    transition: slide               # Task 10: at least one transition
+    slide-number: true
+    incremental: true
+    toc: false
+    width: 1280
+    height: 720
+    embed-resources: true
+footer: "© 2025 Tiffany Wickens • Data: World Bank WDI (2022)"
+execute:
+  echo: false                      # hide code in slides
+  warning: false
+  message: false
+jupyter: python3
+bibliography: references.bib       # use refs file (PwC, WHO, IMF)
+---
+
+## Agenda
+	•	Dataset snapshot
+	•	Visual summaries
+	•	U.S. vs. world
+	•	Key takeaways
+
+
+## Data Overview
+
+Three indicators were analyzed from the World Development Indicators (2022):
+1. GDP per Capita (US$)
+2. Life Expectancy (years)
+3. Unemployment Rate (%)
+
+```{python}
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import wbgapi as wb
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+sns.set(style="whitegrid")
+
+df = pd.read_csv("wdi.csv")
+
+cols = ['country','gdp_per_capita','life_expectancy','unemployment_rate']
+df = df[cols]
+df.head(3)
+
+indicators = {
+    'gdp_per_capita': 'NY.GDP.PCAP.CD',
+    'gdp_growth_rate': 'NY.GDP.MKTP.KD.ZG',
+    'inflation_rate': 'FP.CPI.TOTL.ZG',
+    'unemployment_rate': 'SL.UEM.TOTL.ZS',
+    'total_population': 'SP.POP.TOTL',
+    'life_expectancy': 'SP.DYN.LE00.IN',
+    'adult_literacy_rate': 'SE.ADT.LITR.ZS',
+    'income_inequality': 'SI.POV.GINI',
+    'health_expenditure_gdp_share': 'SH.XPD.CHEX.GD.ZS',
+    'measles_immunisation_rate': 'SH.IMM.MEAS',
+    'education_expenditure_gdp_share': 'SE.XPD.TOTL.GD.ZS',
+    'primary_school_enrolment_rate': 'SE.PRM.ENRR',
+    'exports_gdp_share': 'NE.EXP.GNFS.ZS'
+}
+
+country_codes = wb.region.members('WLD')
+df = wb.data.DataFrame(indicators.values(), economy=country_codes, time=2022, skipBlanks=True, labels=True).reset_index()
+
+df = df.drop(columns=['economy'], errors='ignore')
+
+df.rename(columns=lambda x: {v: k for k, v in indicators.items()}.get(x, x).lower(), inplace=True)
+
+df = df.sort_values('country', ascending=True)
+
+df = df.reset_index(drop=True)
+
+df.to_csv('wdi.csv', index=False)
+```
+
+## Distributions (2022)
+
+:::: {.columns}
+
+::: {.column width="50%"}
+        •	 GDP per capita: The distribution is heavily right-skewed, showing that while a few countries have exceptionally high income levels, the majority remain far below the global average. This imbalance highlights the persistent gap between high-income economies and developing regions, with small advanced economies (like Luxembourg or Singapore) pulling up the global mean.
+        •   Life expectancy: Most countries cluster between 65–80 years, reflecting global progress in healthcare and living standards. The tight spread indicates that, despite economic inequality, longevity has improved worldwide — though outliers with lower life expectancy often correspond to regions affected by conflict or limited healthcare access.
+        •	Unemployment rate: The distribution is slightly right-skewed, with most nations maintaining moderate unemployment levels (under 10%) and a handful exceeding 15–20%. These high-outlier cases often represent economies facing structural challenges or recovery from shocks such as the COVID-19 pandemic.
+:::
+
+::: {.column width="50%"}
+```{python}
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("wdi.csv")
+df.head()
+
+#| label: summary-stats
+#| echo: true
+df[['gdp_per_capita', 'life_expectancy', 'unemployment_rate']].describe()
+
+#| label: correlation
+#| echo: true
+df[['gdp_per_capita', 'life_expectancy', 'unemployment_rate']].corr()
+
+#| label: distributions
+#| fig-cap: "Distribution of Key Indicators (2022)"
+#| echo: true
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+sns.histplot(df['gdp_per_capita'], kde=True, ax=axes[0])
+axes[0].set_title('GDP per Capita')
+
+sns.histplot(df['life_expectancy'], kde=True, ax=axes[1])
+axes[1].set_title('Life Expectancy')
+
+sns.histplot(df['unemployment_rate'], kde=True, ax=axes[2])
+axes[2].set_title('Unemployment Rate')
+
+plt.tight_layout()
+plt.show()
+
+#| label: scatter-gdp-life
+#| fig-cap: "GDP per Capita vs. Life Expectancy (2022)"
+#| echo: true
+plt.figure(figsize=(6,4))
+sns.scatterplot(data=df, x='gdp_per_capita', y='life_expectancy')
+plt.title('GDP per Capita vs. Life Expectancy')
+plt.xlabel('GDP per Capita (USD)')
+plt.ylabel('Life Expectancy (Years)')
+plt.show()
+```
+
+:::
+:::
+		
+
+## Top 10 by GDP per Capita
+
+:::: {.columns}
+
+::: {.column width="50%"}
+    •	Global income is heavily concentrated among a handful of advanced economies, where small, finance and trade-driven nations like Luxembourg and Switzerland far surpass the global average.
+	•	This pattern underscores how wealth reflects economic specialization and productivity, not population size revealing persistent inequality in global prosperity.
+
+:::
+
+::: {.column width="50%"}
+```{python}
+
+#| label: fig-gdp-top10
+#| fig-cap: "Top 10 Countries by GDP per Capita (2022). Data source: World Bank."
+#| echo: false
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("wdi.csv")
+df.head()
+
+top10 = df[['country', 'gdp_per_capita']].sort_values(by='gdp_per_capita', ascending=False).head(10)
+
+plt.figure(figsize=(10,5))
+sns.barplot(data=top10, x='gdp_per_capita', y='country', palette='Blues_r')
+plt.title('Top 10 Countries by GDP per Capita (2022)')
+plt.xlabel('GDP per Capita (USD)')
+plt.ylabel('Country')
+plt.tight_layout()
+plt.show()
+
+#| label: fig-gdp-life
+#| fig-cap: "GDP per Capita vs. Life Expectancy (2022). Higher income countries tend to have longer life expectancy. Source: World Bank."
+#| echo: false
+plt.figure(figsize=(7,5))
+sns.scatterplot(data=df, x='gdp_per_capita', y='life_expectancy', alpha=0.7)
+plt.title('GDP per Capita vs. Life Expectancy (2022)')
+plt.xlabel('GDP per Capita (USD)')
+plt.ylabel('Life Expectancy (Years)')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+:::
+	
+## GDP vs. Life Expectancy
+
+:::: {.columns}
+
+::: {.column width="40%"}
+    •	Higher income generally leads to longer life expectancy, reflecting how wealth improves access to healthcare, education, and living standards.
+	•	However, the curve flattens at high income levels, showing diminishing returns once basic needs are met, further economic growth yields smaller health gains, and progress depends more on equity and system efficiency.
+
+:::
+
+::: {.column width="60%"}
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("wdi.csv")
+df.head()
+
+plt.figure(figsize=(7,5))
+sns.scatterplot(data=df, x='gdp_per_capita', y='life_expectancy', alpha=0.7)
+plt.title('GDP per Capita vs Life Expectancy (2022)')
+plt.xlabel('GDP per Capita (US$)')
+plt.ylabel('Life Expectancy (years)')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+:::
+	
+
+## GDP vs. Unemployment
+
+:::: {.columns}
+
+::: {.column width="40%"}
+    •	Wealthier nations generally experience lower unemployment rates, reflecting stronger economic stability, higher labor demand, and more developed job markets.
+	•	Yet, the relationship is not uniform — unemployment also depends on policy choices, labor flexibility, and economic cycles, meaning even rich countries can face volatility during recessions or structural transitions.
+
+:::
+
+::: {.column width="60%"}
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("wdi.csv")
+df.head()
+
+plt.figure(figsize=(7,5))
+sns.scatterplot(data=df, x='gdp_per_capita', y='unemployment_rate', alpha=0.7)
+plt.title('GDP per Capita vs Unemployment Rate (2022)')
+plt.xlabel('GDP per Capita (US$)')
+plt.ylabel('Unemployment Rate (%)')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+:::
+
+
+## U.S. in Context
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+Summary
+	•	The United States combines extremely high income and low unemployment with one of the most productive economies in the world.
+	•	However, its life expectancy lags behind other high-income nations, highlighting inefficiencies in healthcare access, cost, and equity despite vast economic resources.
+
+:::
+
+::: {.column width="60%"}
+
+```{python}
+#| label: tbl-usa
+#| tbl-cap: "United States vs. high-income and global averages (GDP per capita, life expectancy, unemployment rate) — World Bank WDI (2022)."
+#| echo: false
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("wdi.csv")
+df.head()
+
+# Define groups
+cutoff = df['gdp_per_capita'].quantile(0.8)
+high_income = df[df['gdp_per_capita'] >= cutoff]
+usa = df[df['country'] == 'United States']
+
+# Build comparison table with unemployment instead of health expenditure
+comparison = pd.DataFrame({
+    'Indicator': [
+        'GDP per capita (US$)',
+        'Life expectancy (years)',
+        'Unemployment rate (%)'
+    ],
+    'United States': [
+        usa['gdp_per_capita'].iloc[0] if not usa.empty else float('nan'),
+        usa['life_expectancy'].iloc[0] if not usa.empty else float('nan'),
+        usa['unemployment_rate'].iloc[0] if not usa.empty else float('nan')
+    ],
+    'High-income average': [
+        high_income['gdp_per_capita'].mean(),
+        high_income['life_expectancy'].mean(),
+        high_income['unemployment_rate'].mean()
+    ],
+    'Global average': [
+        df['gdp_per_capita'].mean(),
+        df['life_expectancy'].mean(),
+        df['unemployment_rate'].mean()
+    ]
+})
+
+comparison = comparison.round(2)
+comparison.style.hide(axis='index').format({
+    'United States': '{:,.2f}',
+    'High-income avg (top 20%)': '{:,.2f}',
+    'Global avg': '{:,.2f}'
+})
+```
+
+:::
+:::
+
+## Conclusion
+Overall, the analysis shows that higher national income is strongly associated with better health outcomes wealthier countries tend to enjoy longer life expectancy and greater economic stability. However, the benefits of income growth taper off among already affluent nations, where additional wealth brings smaller gains in longevity. Likewise, low unemployment alone does not guarantee stronger health outcomes, as broader social factors such as healthcare access, preventive care, and system efficiency play a far greater role. Ultimately, sustainable improvements in well-being depend not merely on economic expansion, but on how effectively countries convert their resources into equitable, accessible, and high-quality health systems.
+
+
+## References
+
+Citations:
+	•	PwC Economic Outlook (Q1 2023) [@pwc2023]
+	•	WHO World Health Statistics 2023 [@who2023]
+	•	IMF World Economic Outlook 2024 [@imf2024]
